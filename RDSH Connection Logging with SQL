@@ -13,19 +13,14 @@
 #  Usually happens too quickly for the script to capture the logoff before the disconnect event and has not been worth checking previous events to compare session IDs
 #
 #**********************************************************************************************************************
+
+
+#---------------------------------------------------------------------
 #                   Create Required Objects and Initialise Variables
-#**********************************************************************************************************************
+#---------------------------------------------------------------------
 
 # Import required Modules
 Import-Module PSTerminalServices 
-
-# Load .Net and Visual Basic which allows the construction of forms
-[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
-[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") 
-[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.VisualBasic') | Out-Null
-
-# Setup constants and initialise variables
-#$WSHNetwork = new-Object -com WScript.Network 
 
 # Internal IP address of the RD Gateway server
 # Used to check the external IP address details for external connections
@@ -45,11 +40,6 @@ $Error.Clear()
 $ErrorActionPreference = "SilentlyContinue"
 
 #---------------------------------------------------------------------
-#                   Sub-routines and Functions
-#---------------------------------------------------------------------
-
-
-#---------------------------------------------------------------------
 #                   Main Script
 #---------------------------------------------------------------------
 
@@ -58,7 +48,6 @@ $Event = Get-WinEvent -LogName "Microsoft-Windows-TerminalServices-LocalSessionM
 #Get the session info from the event
 [string]$DomainUser = $Event[0].Properties[0].Value
 [string]$SessionID = $Event[0].Properties[1].Value
-[string]$ClientIP = $Event[0].Properties[2].Value
 [string]$ConnectionTime = $Event[0].TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')
 
 #Split the username and domain, keep only the username
@@ -74,29 +63,33 @@ Switch ($Event[0].ID)
   24 { [string]$ConnectionStatus = "Disconnected" }  
 }
 
- 
-#If the reported IP is the RDG server, query the gateway to get information on the remote connection 
-If ($ClientIP -match $RDGatewayIP)
-{
-  $ConnectionType = "External"
-  $SessionInfo = Get-WmiObject -class "Win32_TSGatewayConnection" -namespace "root\cimv2\TerminalServices" -Computer $RDGatewayIP -Authentication 6 | Where {$_.UserName -eq $DomainUser}
-  $ClientIP = $SessionInfo.ClientAddress
-  $GeoDetails = Invoke-RestMethod -Uri "https://ipinfo.io/$ClientIP"
-  $City = $GeoDetails.City
-  $Region = $GeoDetails.Region
-  $Country = $GeoDetails.Country
-  $ISP = $GeoDetails.Org
-} Else {
-  $ConnectionType = "Internal"
-  Switch -wildcard($ClientIP)
+#Skip gathering IP/location info if this is a disconnect
+If (!($Event[0].ID -eq 24))
+{ 
+  #If the reported IP is the RDG server, query the gateway to get information on the remote connection 
+  If ($($Event[0].Properties[2].Value) -match $RDGatewayIP)
   {
-    "10.11.*.*" { $Office = "WAN Office 1"; Break }
-    "10.12.*.*" { $Office = "WAN Office 2"; Break }
-    "10.13.*.*" { $Office = "WAN Office 3"; Break }
-    # Assume this is a direct connection from a trusted source since not routing via gateway
-    Default { "Direct RDP from external source" }
+    $ConnectionType = "External"
+    $SessionInfo = Get-WmiObject -class "Win32_TSGatewayConnection" -namespace "root\cimv2\TerminalServices" -Computer $RDGatewayIP -Authentication 6 | Where {$_.UserName -eq $DomainUser}
+    $ClientIP = $SessionInfo.ClientAddress
+    $GeoDetails = Invoke-RestMethod -Uri "https://ipinfo.io/$ClientIP"
+    $City = $GeoDetails.City
+    $Region = $GeoDetails.Region
+    $Country = $GeoDetails.Country
+    $ISP = $GeoDetails.Org
+  } Else {
+    $ConnectionType = "Internal"
+	  $ClientIP = $Event[0].Properties[2].Value
+    Switch -wildcard($ClientIP)
+    {
+      "10.11.*.*" { $Office = "Victoria Street"; Break }
+      "10.12.*.*" { $Office = "Wigram"; Break }
+      "10.13.*.*" { $Office = "Ferrymead"; Break }
+      "10.14.*.*" { $Office = "Papanui"; Break }
+      Default { $ConnectionType = "External"; $Office = "Direct RDP" }
+    }
   }
-} 
+}  
 
 $SQLQuery="
 INSERT INTO dbo.Logging
