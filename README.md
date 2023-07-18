@@ -1,6 +1,8 @@
 # RDSH Connection Logging
 
-Before using ensure to update the required variables for the site
+Before using ensure to update the required variables for the site.
+Also update the office names down in the switch as needed.
+
 Requires (to be installed on the RDSH hosts):
  - Either SQLcmd or SQLPowershell 
  - PSTerminalServices powershell module
