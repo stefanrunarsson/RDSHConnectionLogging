@@ -82,10 +82,10 @@ If (!($Event[0].ID -eq 24))
 	  $ClientIP = $Event[0].Properties[2].Value
     Switch -wildcard($ClientIP)
     {
-      "10.11.*.*" { $Office = "Victoria Street"; Break }
-      "10.12.*.*" { $Office = "Wigram"; Break }
-      "10.13.*.*" { $Office = "Ferrymead"; Break }
-      "10.14.*.*" { $Office = "Papanui"; Break }
+      "10.11.*.*" { $Office = "Office A"; Break }
+      "10.12.*.*" { $Office = "Office B"; Break }
+      "10.13.*.*" { $Office = "Office C"; Break }
+      "10.14.*.*" { $Office = "Office D"; Break }
       Default { $ConnectionType = "External"; $Office = "Direct RDP" }
     }
   }
